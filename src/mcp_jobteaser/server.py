@@ -1,0 +1,82 @@
+"""MCP server exposing JobTeaser job search as a tool over streamable-http."""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+
+import uvicorn
+from mcp.server.mcpserver import MCPServer
+from starlette.applications import Starlette
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+
+from mcp_jobteaser.config import (
+    DEFAULT_MAX_OFFERS,
+    MCP_AUTH_TOKEN,
+    MCP_HTTP_HOST,
+    MCP_HTTP_PORT,
+)
+from mcp_jobteaser.search_service import search_job_offers
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+mcp = MCPServer(
+    name="jobteaser",
+    instructions=(
+        "Recherche des offres publiees sur JobTeaser. Retourne une liste "
+        "d'offres (titre, entreprise, lieu, contrat, url) sans le detail "
+        "complet de chaque offre."
+    ),
+)
+
+
+@mcp.tool()
+async def search_job_offers_tool(query: str, max_offers: int = DEFAULT_MAX_OFFERS) -> dict:
+    """Recherche des offres JobTeaser correspondant a `query`.
+
+    Args:
+        query: Termes de recherche, equivalent au champ de recherche JobTeaser
+            (ex: "stage DevOps").
+        max_offers: Nombre maximal d'offres a retourner (defaut 50, plafond 100).
+    """
+    result = await asyncio.to_thread(search_job_offers, query, max_offers)
+    return result.model_dump()
+
+
+class BearerAuthMiddleware(BaseHTTPMiddleware):
+    """Rejects any request that doesn't carry the expected bearer token.
+
+    Kept deliberately simple (no OAuth flow) since this server has a single
+    caller (Claude) authenticating with one static, pre-shared token.
+    """
+
+    def __init__(self, app, token: str) -> None:
+        super().__init__(app)
+        self._expected_header = f"Bearer {token}"
+
+    async def dispatch(self, request: Request, call_next):
+        if request.headers.get("authorization") != self._expected_header:
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        return await call_next(request)
+
+
+def build_app() -> Starlette:
+    app = mcp.streamable_http_app()
+    if MCP_AUTH_TOKEN:
+        app.add_middleware(BearerAuthMiddleware, token=MCP_AUTH_TOKEN)
+    else:
+        logger.warning(
+            "MCP_AUTH_TOKEN is not set: the HTTP server is exposed without authentication."
+        )
+    return app
+
+
+def main() -> None:
+    uvicorn.run(build_app(), host=MCP_HTTP_HOST, port=MCP_HTTP_PORT)
+
+
+if __name__ == "__main__":
+    main()

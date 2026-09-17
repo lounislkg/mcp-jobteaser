@@ -1,0 +1,26 @@
+[project]
+name = "mcp-jobteaser"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "lounislkg", email = "l3gromenil@outlook.fr" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "mcp[cli]>=2.2.0",
+    "playwright>=1.63.0",
+    "pydantic>=2.13.5",
+]
+
+[project.scripts]
+mcp-jobteaser = "mcp_jobteaser:main"
+
+[build-system]
+requires = ["uv_build>=0.12.10,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
