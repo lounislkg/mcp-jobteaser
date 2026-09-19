@@ -24,9 +24,18 @@ build-push:
   stage: build
   image: quay.io/podman/stable
   script:
-    - podman build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA -t $CI_REGISTRY_IMAGE:latest .
-    - podman login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - podman push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
-    - podman push $CI_REGISTRY_IMAGE:latest
+    # Créer le manifest qui va contenir les deux architectures
+    - podman manifest create $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+
+    # Build pour amd64 et arm64, ajoutés au même manifest
+    - podman build --platform linux/amd64 --manifest $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA .
+    - podman build --platform linux/arm64 --manifest $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA .
+
+    # Push le manifest avec le tag du commit
+    - podman manifest push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA docker://$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+
+    # Tag aussi en "latest" et push
+    - podman tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA $CI_REGISTRY_IMAGE:latest
+    - podman manifest push $CI_REGISTRY_IMAGE:latest docker://$CI_REGISTRY_IMAGE:latest
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
