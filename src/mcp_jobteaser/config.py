@@ -9,6 +9,12 @@ BASE_URL = "https://www.jobteaser.com/fr/job-offers"
 DEFAULT_MAX_OFFERS = 50
 HARD_CAP_MAX_OFFERS = 100
 
+# Each offer detail costs one browser page load plus a delay, so a single
+# call is capped to keep it well under typical MCP client timeouts.
+MAX_IDS_PER_DETAILS_CALL = 10
+DEFAULT_DESCRIPTION_MAX_CHARS = 6000
+HARD_CAP_DESCRIPTION_MAX_CHARS = 20000
+
 # Delay between paginated page loads, to stay polite towards JobTeaser and
 # reduce the chance of triggering their anti-bot protection.
 PAGE_DELAY_SECONDS = float(os.environ.get("JOBTEASER_PAGE_DELAY_SECONDS", "1.5"))

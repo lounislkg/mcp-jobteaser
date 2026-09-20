@@ -2,6 +2,8 @@
 
 Serveur MCP qui recherche des offres publiées sur [JobTeaser](https://www.jobteaser.com) et les
 retourne en JSON (titre, entreprise, lieu, contrat, url...), sans le détail complet de chaque offre.
+Un second outil récupère ce détail (description complète, profil recherché...) pour les offres
+choisies par l'agent, à partir de leur `id`.
 
 ## Comment ça marche
 
@@ -18,10 +20,13 @@ pages sans retester — voir `src/mcp_jobteaser/search_service.py`.
 
 ```
 src/mcp_jobteaser/
-├── server.py                        # serveur MCP (streamable-http) + outil exposé
-├── search_service.py                # boucle de pagination, gestion du navigateur
+├── server.py                        # serveur MCP (streamable-http) + outils exposés
+├── search_service.py                # boucle de pagination de la recherche
+├── details_service.py               # récupération du détail d'une liste d'offres par id
+├── browser.py                       # lancement de Chromium + contexte neuf (partagé)
 ├── pages/job_offers_search_page.py  # Page Object : sélecteurs + parsing d'une page de résultats
-├── models.py                        # JobOffer / SearchResult (pydantic)
+├── pages/job_offer_page.py          # Page Object : sélecteurs + parsing d'une page d'offre
+├── models.py                        # JobOffer / SearchResult / JobOfferDetails... (pydantic)
 └── config.py                        # constantes / variables d'environnement
 ```
 
@@ -165,8 +170,8 @@ C'est le cas d'usage visé (tâches nocturnes qui tournent dans le cloud, PC per
 2. URL : `https://ton-domaine/mcp`
 3. Renseigner l'authentification par en-tête personnalisé : `Authorization: Bearer <ton-token>`
 
-Une fois le connecteur ajouté, l'outil `search_job_offers_tool` est disponible dans les conversations
-et les tâches programmées qui l'activent.
+Une fois le connecteur ajouté, les outils `search_job_offers_tool` et `get_job_offers_details_tool`
+sont disponibles dans les conversations et les tâches programmées qui l'activent.
 
 ## Outil exposé
 
@@ -179,3 +184,32 @@ et les tâches programmées qui l'activent.
 Retourne un objet avec `query`, `total_offers_found`, `pages_scanned`, `reached_end_of_results`
 (`true` si JobTeaser n'a plus d'offres correspondantes, `false` si on s'est arrêté à cause de
 `max_offers`), et la liste `offers`.
+
+`get_job_offers_details_tool(ids: list[str], max_chars: int = 6000)`
+
+À appeler sur les offres jugées pertinentes après la recherche, pas sur toute la liste : chaque offre
+coûte un chargement de page.
+
+- `ids` : champs `id` des offres (UUID) tels que retournés par `search_job_offers_tool`. 10 maximum
+  par appel (`MAX_IDS_PER_DETAILS_CALL` dans `config.py`) ; au-delà l'appel est refusé.
+- `max_chars` : longueur maximale de la description par offre (plafond dur à 20000).
+
+Le serveur reste sans état : l'agent renvoie les `id`, le serveur reconstruit l'URL. JobTeaser
+redirige `/fr/job-offers/<id>` vers l'URL canonique (avec le « slug » décoratif), donc l'`id` seul
+suffit.
+
+Retourne `offers` (par offre : `id`, `url`, `title`, `company`, `location`, `contract_type`,
+`start_date`, `salary`, `remote_policy`, `study_level`, `function`, `application_deadline`,
+`posted_at`, `description`, `description_truncated`) et `errors`. Les champs que le recruteur n'a pas
+renseignés valent `null`. Un échec sur un id n'empêche pas les autres d'être retournés ; chaque
+entrée de `errors` porte un code :
+
+| Code | Signification |
+|---|---|
+| `invalid_id` | l'id n'est pas un UUID |
+| `not_found` | offre expirée ou supprimée (HTTP 404) |
+| `blocked` | le challenge anti-bot de JobTeaser a intercepté la page (transitoire) |
+| `timeout` | la page ne s'est pas chargée à temps (transitoire) |
+
+Les deux outils pilotent un Chromium : un verrou (`_browser_lock` dans `server.py`) garantit qu'un seul
+navigateur tourne à la fois, même si l'agent envoie plusieurs appels en parallèle.

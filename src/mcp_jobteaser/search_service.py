@@ -7,13 +7,11 @@ import time
 
 from playwright.sync_api import Browser, TimeoutError as PlaywrightTimeoutError, sync_playwright
 
+from mcp_jobteaser.browser import launch_browser, new_context
 from mcp_jobteaser.config import (
-    CHROMIUM_EXECUTABLE_PATH,
-    CHROMIUM_EXTRA_ARGS,
     DEFAULT_MAX_OFFERS,
     HARD_CAP_MAX_OFFERS,
     PAGE_DELAY_SECONDS,
-    USER_AGENT,
 )
 from mcp_jobteaser.models import JobOffer, SearchResult
 from mcp_jobteaser.pages.job_offers_search_page import JobOffersSearchPage
@@ -39,11 +37,7 @@ def _fetch_page(browser: Browser, query: str, page_number: int) -> list[JobOffer
     """
     last_error: PlaywrightTimeoutError | None = None
     for attempt in range(1, _MAX_ATTEMPTS_PER_PAGE + 1):
-        context = browser.new_context(
-            locale="fr-FR",
-            user_agent=USER_AGENT,
-            viewport={"width": 1280, "height": 900},
-        )
+        context = new_context(browser)
         try:
             search_page = JobOffersSearchPage(context.new_page())
             search_page.goto(query, page_number)
@@ -80,11 +74,7 @@ def search_job_offers(query: str, max_offers: int | None = None) -> SearchResult
     reached_end = False
 
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(
-            headless=True,
-            executable_path=CHROMIUM_EXECUTABLE_PATH,
-            args=CHROMIUM_EXTRA_ARGS,
-        )
+        browser = launch_browser(playwright)
         try:
             while len(offers) < limit:
                 logger.info("Fetching page %d for query=%r", page_number, query)

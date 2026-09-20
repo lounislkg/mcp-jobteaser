@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -29,3 +31,48 @@ class SearchResult(BaseModel):
         "empty results page, False if it stopped because max_offers was reached."
     )
     offers: list[JobOffer]
+
+
+class JobOfferDetails(BaseModel):
+    id: str
+    url: str
+    title: str
+    company: str
+    location: str | None = None
+    contract_type: str | None = None
+    start_date: str | None = None
+    salary: str | None = None
+    remote_policy: str | None = None
+    study_level: str | None = None
+    function: str | None = None
+    application_deadline: str | None = None
+    posted_at: str | None = Field(
+        default=None,
+        description="Publication date as an ISO date (YYYY-MM-DD).",
+    )
+    description: str = Field(
+        description="Full offer text (missions, required profile...), as plain text."
+    )
+    description_truncated: bool = Field(
+        default=False,
+        description="True if the description was cut to fit `max_chars`.",
+    )
+
+
+class OfferDetailsError(BaseModel):
+    id: str
+    error: Literal["invalid_id", "not_found", "blocked", "timeout"] = Field(
+        description="invalid_id: not a UUID. not_found: offer expired or removed. "
+        "blocked: JobTeaser's anti-bot challenge intercepted the page. "
+        "timeout: the page did not load in time. blocked and timeout are "
+        "transient and worth retrying later."
+    )
+    message: str
+
+
+class OfferDetailsResult(BaseModel):
+    offers: list[JobOfferDetails]
+    errors: list[OfferDetailsError] = Field(
+        description="One entry per requested id that could not be fetched. "
+        "A failure on one id never prevents the others from being returned."
+    )
