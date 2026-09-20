@@ -17,6 +17,7 @@ from mcp_jobteaser.config import (
     MCP_AUTH_TOKEN,
     MCP_HTTP_HOST,
     MCP_HTTP_PORT,
+    MCP_PUBLIC_HOST,
 )
 from mcp_jobteaser.search_service import search_job_offers
 
@@ -64,7 +65,12 @@ class BearerAuthMiddleware(BaseHTTPMiddleware):
 
 
 def build_app() -> Starlette:
-    app = mcp.streamable_http_app()
+    app = mcp.streamable_http_app(
+        transport_security=TransportSecuritySettings(
+            allowed_hosts=[MCP_PUBLIC_HOST, f"{MCP_PUBLIC_HOST}:*"],
+            allowed_origins=[f"https://{MCP_PUBLIC_HOST}"],
+        )
+    )
     if MCP_AUTH_TOKEN:
         app.add_middleware(BearerAuthMiddleware, token=MCP_AUTH_TOKEN)
     else:

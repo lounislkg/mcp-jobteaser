@@ -24,7 +24,8 @@ ENV CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium \
     CHROMIUM_EXTRA_ARGS=--no-sandbox,--disable-dev-shm-usage \
     MCP_HTTP_HOST=0.0.0.0 \
     MCP_HTTP_PORT=8000 \
-    PATH="/app/.venv/bin:$PATH"
+    PATH="/app/.venv/bin:$PATH" \
+    MCP_PUBLIC_HOST=mcp-jobteaser.beuteuchat.tech
 
 RUN useradd --create-home appuser && chown -R appuser:appuser /app
 USER appuser

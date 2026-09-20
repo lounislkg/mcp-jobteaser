@@ -39,3 +39,6 @@ CHROMIUM_EXTRA_ARGS = [
 MCP_AUTH_TOKEN = os.environ.get("MCP_AUTH_TOKEN")
 MCP_HTTP_HOST = os.environ.get("MCP_HTTP_HOST", "0.0.0.0")
 MCP_HTTP_PORT = int(os.environ.get("MCP_HTTP_PORT", "8000"))
+
+# Public hostname of the server, used to configure the streamable-http transport.
+MCP_PUBLIC_HOST = os.environ.get("MCP_PUBLIC_HOST", "mcp-jobteaser.beuteuchat.tech")
